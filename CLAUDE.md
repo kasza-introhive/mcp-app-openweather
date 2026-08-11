@@ -85,6 +85,35 @@ The fake bridge does **not** enforce the iframe sandbox or CSP, so passing E2E
 proves this app's logic, not host compatibility. See the README for verifying
 against `ext-apps/examples/basic-host`.
 
+## Debugging
+
+`docs/TROUBLESHOOTING.md` is the reference: the payload crosses five rungs
+(data → handler → wire → host bridge → render) and each is observable in
+isolation. Keep it current — it's a deliverable, not scratch notes.
+
+The constraint that shapes the diagnostics: **a real host may give you no
+console.** Claude Desktop's webview exposes no DevTools, so `console.log` in the
+app goes nowhere. Hence two rules:
+
+- **On-screen errors carry their own diagnosis.** `describeResultShape()` in
+  `src/debug.ts` reports what actually arrived, and `missingDataError()` embeds
+  it in the visible message (`structuredContent=absent` vs `points=0` are
+  different bugs). Don't reduce these back to a bare string.
+- **Verbose logging is gated, never ad-hoc.** `debugLog` behind `?mcpDebug=1` in
+  the app; `MCP_APP_DEBUG=1` for the server handler. Server-side logging must
+  use `console.error` — stdout is the JSON-RPC channel under stdio.
+
+MCP Inspector is the fastest way to see the wire without a host:
+`npx @modelcontextprotocol/inspector node --env-file-if-exists=.env --import tsx main.ts --stdio`.
+If `structuredContent` is right there but missing in the app, the server is
+exonerated.
+
+`outputSchema` on the tool is asserted by `tests/server/server.test.ts` for the
+same reason as `_meta.ui.resourceUri`: the app renders `structuredContent` and
+nothing else, so the tool must declare it. Note the SDK does *not* strip
+`structuredContent` when `outputSchema` is absent (verified in `server/mcp.js`
+and `client/index.js`) — so if the field vanishes, suspect the host.
+
 ## Environment constraints
 
 Pinned deliberately: `vite` 7 and `@vitejs/plugin-react` ^5.2.0 —

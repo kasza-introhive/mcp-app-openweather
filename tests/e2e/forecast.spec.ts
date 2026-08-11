@@ -132,6 +132,38 @@ test.describe("initial render", () => {
     await expect(app.getByTestId("error")).toContainText("OPENWEATHER_API_KEY");
     await expect(app.getByTestId("forecast-chart")).toHaveCount(0);
   });
+
+  /*
+   * The failure mode that cost real debugging time: a successful result whose
+   * `structuredContent` never reaches the app. `structuredContent` is OPTIONAL
+   * in `McpUiToolResultNotification`, so a host is free not to forward it and
+   * the app sees a result that looks fine apart from the one field it needs.
+   *
+   * The assertion on the shape text is the point -- the message has to say what
+   * arrived, because a real host may give you no console to inspect.
+   * See docs/TROUBLESHOOTING.md.
+   */
+  test("reports the received shape when structuredContent is absent", async ({ page }) => {
+    const app = await openApp(page, {
+      initialResult: { content: [{ type: "text", text: "Forecast for Halifax" }] },
+    });
+
+    const error = app.getByTestId("error");
+    await expect(error).toContainText("did not contain forecast data");
+    await expect(error).toContainText("structuredContent=absent");
+    await expect(app.getByTestId("forecast-chart")).toHaveCount(0);
+  });
+
+  test("reports the received shape when the series has no points", async ({ page }) => {
+    const result = toolResult();
+    const app = await openApp(page, {
+      initialResult: { ...result, structuredContent: { ...result.structuredContent, points: [] } },
+    });
+
+    // An empty series must error rather than draw an empty chart.
+    await expect(app.getByTestId("error")).toContainText("points=0");
+    await expect(app.getByTestId("forecast-chart")).toHaveCount(0);
+  });
 });
 
 test.describe("client-side controls", () => {

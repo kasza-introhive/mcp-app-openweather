@@ -67,6 +67,25 @@ describe("tools/list", () => {
     );
     expect(schema.required).toContain("location");
   });
+
+  /*
+   * The app renders `structuredContent` and nothing else. A tool returning
+   * structured data must advertise its shape: clients use `outputSchema` to
+   * decide whether to expect and validate that field, and a host may decline to
+   * forward what the tool never declared. Dropping this is a silent break of
+   * exactly the same kind as dropping `_meta.ui.resourceUri`.
+   */
+  it("declares the output schema describing structuredContent", async () => {
+    const { tools } = await client.listTools();
+    const schema = tools.find((t) => t.name === TOOL_NAME)!.outputSchema as
+      | { properties?: Record<string, unknown>; required?: string[] }
+      | undefined;
+
+    expect(schema).toBeDefined();
+    expect(Object.keys(schema!.properties ?? {})).toEqual(
+      expect.arrayContaining(["location", "units", "timezoneOffsetSeconds", "points"]),
+    );
+  });
 });
 
 describe("resources/list", () => {

@@ -20,6 +20,7 @@ import path from "node:path";
 import { z } from "zod";
 import {
   fetchForecast,
+  forecastSeriesShape,
   resolveLocation,
   summarize,
   toSeries,
@@ -65,6 +66,11 @@ export function createServer(): McpServer {
           .default(5)
           .describe("How many days of forecast to return (1-5)"),
       },
+      // Declares the shape of `structuredContent`. The app hard-depends on that
+      // field, and a tool returning structured data should advertise it: hosts
+      // and clients use `outputSchema` to decide whether to expect, validate,
+      // and forward `structuredContent` at all.
+      outputSchema: forecastSeriesShape,
       // Links this tool to the UI resource below.
       _meta: { ui: { resourceUri: RESOURCE_URI } },
     },
@@ -80,10 +86,24 @@ export function createServer(): McpServer {
       // pattern:
       //   - `content`           -> compact text, cheap for the model to read.
       //   - `structuredContent` -> full series, what the chart actually renders.
-      return {
+      const result: CallToolResult = {
         content: [{ type: "text", text: summarize(series) }],
         structuredContent: series as unknown as Record<string, unknown>,
       };
+
+      // Set MCP_APP_DEBUG=1 to record what the handler actually returned. This
+      // is the only way to observe the server end of the payload from inside a
+      // real host -- it lands in the host's server log (see
+      // docs/TROUBLESHOOTING.md). `console.error`, never `console.log`: stdout
+      // is the JSON-RPC channel under stdio.
+      if (process.env.MCP_APP_DEBUG === "1") {
+        console.error(
+          `[${TOOL_NAME}] returning content=${result.content.length} block(s), ` +
+            `structuredContent.points=${series.points.length}, location=${series.location.name}`,
+        );
+      }
+
+      return result;
     },
   );
 

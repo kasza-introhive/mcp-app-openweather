@@ -221,6 +221,12 @@ type "%APPDATA%\Claude\logs\mcp-server-openweather-forecast.log"
 | Unparseable-message errors | Launched via `npm` instead of `node` (see step 5) |
 | Tool errors mentioning `OPENWEATHER_API_KEY` | `.env` missing, key not pasted, or key not yet activated |
 | Chart never renders but text works | `npm run build` wasn't run, so `dist/mcp-app.html` is absent |
+| Chart renders but shows an error | Read the shape in the message, then see [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) |
+
+For anything subtler than the table above — especially a chart that loads but
+shows an error — [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) walks the
+payload's five rungs (data source → tool handler → wire → host bridge → render)
+and shows how to observe each one in isolation.
 
 To confirm the server itself is healthy, independent of Claude, run it by hand
 from the project directory — it should print one line of JSON:

@@ -16,6 +16,7 @@ import { StrictMode, useCallback, useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { ForecastChart, type Metric } from "./components/ForecastChart.tsx";
 import { Controls } from "./components/Controls.tsx";
+import { debugLog, describeResultShape } from "./debug.ts";
 import {
   ICON_BASE_URL,
   unitSymbols,
@@ -40,11 +41,25 @@ function extractSeries(result: CallToolResult): ForecastSeries | null {
     candidate &&
     typeof candidate === "object" &&
     Array.isArray((candidate as ForecastSeries).points) &&
+    // An empty series would render an axis with nothing on it, which reads as a
+    // broken chart rather than an error. Treat it as missing data.
+    (candidate as ForecastSeries).points.length > 0 &&
     (candidate as ForecastSeries).location != null
   ) {
     return candidate as ForecastSeries;
   }
   return null;
+}
+
+/**
+ * The message shown when a result arrives without a usable series.
+ *
+ * It embeds the actual shape received because this app may be running in a host
+ * with no reachable console -- the screen is the only diagnostic channel. See
+ * docs/TROUBLESHOOTING.md.
+ */
+function missingDataError(result: CallToolResult): string {
+  return `The tool result did not contain forecast data. Received: ${describeResultShape(result)}`;
 }
 
 function errorTextOf(result: CallToolResult): string {
@@ -64,6 +79,7 @@ function ForecastApp() {
       // Fires when the host pushes the result of the tool call that opened
       // this app, and again for any result the host chooses to forward.
       app.ontoolresult = (result) => {
+        debugLog("ontoolresult:", describeResultShape(result));
         if (result.isError) {
           setError(errorTextOf(result));
           return;
@@ -73,7 +89,7 @@ function ForecastApp() {
           setSeries(next);
           setError(null);
         } else {
-          setError("The tool result did not contain forecast data.");
+          setError(missingDataError(result));
         }
       };
 
@@ -177,6 +193,7 @@ function ForecastAppInner({
           },
         });
 
+        debugLog("callServerTool result:", describeResultShape(result));
         if (result.isError) {
           setError(errorTextOf(result));
           return;
@@ -186,7 +203,7 @@ function ForecastAppInner({
           setSeries(parsed);
           setError(null);
         } else {
-          setError("The tool result did not contain forecast data.");
+          setError(missingDataError(result));
         }
       } catch (e) {
         setError(e instanceof Error ? e.message : String(e));
