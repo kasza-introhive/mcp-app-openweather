@@ -1,0 +1,38 @@
+/*
+ * Host-aware baseline. Hosts expose their theme through CSS custom properties;
+ * the fallbacks keep the app legible when rendered standalone (e.g. in the
+ * Playwright specs, which load this file directly with no host styling).
+ */
+:root {
+  color-scheme: light dark;
+  --app-fg: var(--mcp-ui-color-text, #1a1a1a);
+  --app-fg-muted: var(--mcp-ui-color-text-secondary, #6b7280);
+  --app-bg: var(--mcp-ui-color-background, #ffffff);
+  --app-surface: var(--mcp-ui-color-surface, #f6f7f9);
+  --app-border: var(--mcp-ui-color-border, #e2e5ea);
+  --app-accent: var(--mcp-ui-color-accent, #2563eb);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --app-fg: var(--mcp-ui-color-text, #f3f4f6);
+    --app-fg-muted: var(--mcp-ui-color-text-secondary, #9ca3af);
+    --app-bg: var(--mcp-ui-color-background, #16181d);
+    --app-surface: var(--mcp-ui-color-surface, #1f2228);
+    --app-border: var(--mcp-ui-color-border, #31353d);
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family:
+    var(--mcp-ui-font-family, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif);
+  color: var(--app-fg);
+  background: var(--app-bg);
+  font-size: 14px;
+  line-height: 1.5;
+}
