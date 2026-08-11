@@ -303,12 +303,20 @@ enforce the iframe sandbox or CSP. For that:
 
 ```bash
 git clone https://github.com/modelcontextprotocol/ext-apps
-cd ext-apps/examples/basic-host && npm install
-SERVERS='["http://localhost:3001/mcp"]' npm start   # then open localhost:8080
+cd ext-apps && npm install && npm run build   # a workspace: install at the ROOT
+cd examples/basic-host && npm run build
+SERVERS='["http://localhost:3001/mcp"]' node --import tsx serve.ts   # open localhost:8080
 ```
+
+Installing inside `examples/basic-host` triggers the workspace root's `prepare`
+script and fails. `npm run serve` there wants `bun`; `serve.ts` is plain express,
+so `node --import tsx` works if you don't have it.
 
 Confirm the chart draws, the icons load (that's the CSP allowance working), and a
 control change shows a new `tools/call` in the server log.
+
+For anything that survives this, see
+[docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md).
 
 ## Why forecast and not history
 

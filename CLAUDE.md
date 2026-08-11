@@ -104,9 +104,10 @@ the evidence.
 (data → handler → wire → host bridge → render) and each is observable in
 isolation. Keep it current — it's a deliverable, not scratch notes.
 
-The constraint that shapes the diagnostics: **a real host may give you no
-console.** Claude Desktop's webview exposes no DevTools, so `console.log` in the
-app goes nowhere. Hence two rules:
+The constraint that shapes the diagnostics: **a host may give you no console.**
+Claude Desktop does have DevTools (Help → Troubleshooting → Enable Developer
+Mode, then `Cmd+Option+I`; the app is the inner iframe), but a different host or
+a user's machine may not. Hence two rules:
 
 - **On-screen errors carry their own diagnosis.** `describeResultShape()` in
   `src/debug.ts` reports what actually arrived, and `missingDataError()` embeds
