@@ -77,21 +77,157 @@ diagnostic in `main.ts` uses `console.error`.
 The HTTP mode is stateless — `sessionIdGenerator: undefined`, with a fresh
 server and transport per request, closed on `res.close`. Nothing to reap.
 
-Registering with a stdio host (e.g. `claude mcp add`):
-
-```json
-{
-  "command": "npm",
-  "args": ["run", "serve:stdio"],
-  "cwd": "/absolute/path/to/mcp-app-openweather"
-}
-```
-
 Sharing the HTTP server as a custom connector:
 
 ```bash
 npx cloudflared tunnel --url http://localhost:3001
 # add the resulting https URL + /mcp as a custom connector
+```
+
+## Adding it to the Claude desktop app
+
+Written for someone who has never set up an MCP server. A Claude Pro account is
+enough. Claude Desktop supports the MCP Apps extension, so the chart renders
+inline rather than falling back to text.
+
+You'll wire this up as a **local stdio server**: Claude Desktop starts the
+process itself, so there's no hosting, no tunnel, and no login. Roughly 10
+minutes.
+
+### 1. Install the prerequisites
+
+- **Claude Desktop** — https://claude.ai/download. If it's already installed,
+  use *Check for Updates…* in the Claude menu.
+- **Node.js 20+** — https://nodejs.org (the LTS build). Verify in a terminal:
+
+  ```bash
+  node --version
+  ```
+
+### 2. Set the project up
+
+```bash
+git clone https://github.com/kasza-introhive/mcp-app-openweather.git
+cd mcp-app-openweather
+npm install
+npm run build      # REQUIRED -- creates dist/mcp-app.html, which IS the chart
+```
+
+Skipping `npm run build` is the most common mistake: the server starts fine and
+the tool returns data, but asking for the UI errors out because the bundle it
+serves doesn't exist yet.
+
+### 3. Add your OpenWeather API key
+
+Sign up at https://openweathermap.org/api and copy your key from
+https://home.openweathermap.org/api_keys — the **free tier** is all this needs.
+
+```bash
+cp .env.example .env
+```
+
+Open `.env` and paste the key after `OPENWEATHER_API_KEY=`. A brand-new key can
+take ~10 minutes to activate; until then every request returns 401.
+
+### 4. Find your absolute paths
+
+Claude Desktop doesn't run with your shell's `PATH`, so both the Node binary and
+the project directory must be spelled out in full. Print them:
+
+```bash
+command -v node   # e.g. /usr/local/bin/node   (Windows: where node)
+pwd               # e.g. /Users/you/code/mcp-app-openweather
+```
+
+### 5. Edit the Claude Desktop config
+
+Open the **Claude** menu in your OS menu bar (not the settings inside the chat
+window) → **Settings…** → **Developer** tab → **Edit Config**. That creates or
+opens:
+
+- **macOS:** `~/Library/Application Support/Claude/claude_desktop_config.json`
+- **Windows:** `%APPDATA%\Claude\claude_desktop_config.json`
+
+Add this, substituting the two paths from step 4:
+
+```json
+{
+  "mcpServers": {
+    "openweather-forecast": {
+      "command": "/absolute/path/to/node",
+      "args": [
+        "--env-file-if-exists=.env",
+        "--import", "tsx",
+        "main.ts",
+        "--stdio"
+      ],
+      "cwd": "/absolute/path/to/mcp-app-openweather"
+    }
+  }
+}
+```
+
+If the file already has an `mcpServers` block, add `"openweather-forecast"`
+alongside your existing entries rather than replacing them.
+
+Two things here are load-bearing, and both cause failures that look like
+something else:
+
+- **Call `node` directly, not `npm run serve:stdio`.** `npm` prints a two-line
+  banner to *stdout*, and under stdio stdout is the JSON-RPC channel — the
+  banner corrupts the first message and the server appears to fail for no
+  reason. The npm scripts are for humans in a terminal.
+- **`cwd` is required.** `--import tsx` resolves `tsx` from the working
+  directory, so without it Node exits with `ERR_MODULE_NOT_FOUND`.
+
+On Windows, write paths with escaped backslashes:
+`"C:\\Program Files\\nodejs\\node.exe"`.
+
+### 6. Restart and confirm
+
+Quit Claude Desktop **completely** (⌘Q / right-click → Quit — closing the window
+isn't enough) and reopen it. Config is only read at startup.
+
+Click the **Add files, connectors, and more** (`/`) control at the bottom-left of
+the message box, hover **Connectors** → **Manage connectors**, and look for
+`openweather-forecast` with `get-forecast` listed under it.
+
+### 7. Ask for a forecast
+
+> "What's the weather forecast for Halifax this week?"
+
+Claude will ask permission to run `get-forecast` the first time — approve it. An
+interactive chart appears in the conversation. Click **Humidity** to reshape the
+data instantly (no server call), or **°F** / **1 day** to trigger a fresh
+`tools/call`.
+
+### If it doesn't show up
+
+Read the logs first — they name the actual cause:
+
+```bash
+# macOS
+tail -n 50 -f ~/Library/Logs/Claude/mcp-server-openweather-forecast.log
+
+# Windows
+type "%APPDATA%\Claude\logs\mcp-server-openweather-forecast.log"
+```
+
+| Symptom | Cause |
+|---|---|
+| Connector absent entirely | Invalid JSON in the config (a trailing comma is the usual culprit), or Claude wasn't fully quit |
+| `ERR_MODULE_NOT_FOUND` | `cwd` missing or wrong |
+| `spawn ENOENT` | The `command` path is wrong — re-run `command -v node` |
+| Unparseable-message errors | Launched via `npm` instead of `node` (see step 5) |
+| Tool errors mentioning `OPENWEATHER_API_KEY` | `.env` missing, key not pasted, or key not yet activated |
+| Chart never renders but text works | `npm run build` wasn't run, so `dist/mcp-app.html` is absent |
+
+To confirm the server itself is healthy, independent of Claude, run it by hand
+from the project directory — it should print one line of JSON:
+
+```bash
+echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"c","version":"1"}}}' \
+  | node --env-file-if-exists=.env --import tsx main.ts --stdio
 ```
 
 ## Try it
