@@ -251,6 +251,23 @@ So the app is handed the model's version of the result. Everything else follows:
 two blocks, an `isError` the server never set, no `structuredContent`, a model
 that answers correctly, and a chart that cannot draw.
 
+**Only the push path is affected.** An app-initiated `callServerTool` returns
+`structuredContent` intact in the same host, on the same call. Proven from the
+server log: reopening two affected conversations produced one fresh `tools/call`
+each, seconds after the bundle loaded, and both charts then rendered —
+
+```
+13:06:52  resources/read                      <- app bundle loads
+13:06:54  tools/call  -> Downtown Toronto     <- app re-fetches
+13:07:58  tools/call  -> Japan
+```
+
+Hosts do not re-run tools when a conversation is reopened, so those calls came
+from the app. That asymmetry is what makes a workaround possible: `ontoolinput`
+still delivers the original arguments, so an app whose pushed result is missing
+its series can just ask again. `src/mcp-app.tsx` does exactly that, and the path
+only runs when the series is absent, so a correct host never pays for it.
+
 Conclusion: **the server was correct at every rung it owns**, and the payload
 died crossing the host→app bridge. Declaring `outputSchema` did not change this
 (it was added during the investigation and kept because it is right, not because

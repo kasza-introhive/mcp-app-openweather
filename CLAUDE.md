@@ -85,6 +85,19 @@ The fake bridge does **not** enforce the iframe sandbox or CSP, so passing E2E
 proves this app's logic, not host compatibility. See the README for verifying
 against `ext-apps/examples/basic-host`.
 
+## The Claude Desktop fallback
+
+`ontoolresult` has a recovery path: when the pushed result carries no series,
+the app re-fetches with the arguments captured from `ontoolinput`. Claude
+Desktop forwards the *model-facing* copy of the tool result — original text plus
+a synthetic "the user can already see the widget" note — and drops
+`structuredContent`. App-initiated calls are unaffected, which is what makes the
+recovery work.
+
+It only runs when the series is missing, so a correct host never reaches it.
+Remove it once the push path is fixed upstream; `docs/TROUBLESHOOTING.md` has
+the evidence.
+
 ## Debugging
 
 `docs/TROUBLESHOOTING.md` is the reference: the payload crosses five rungs

@@ -96,17 +96,19 @@ function ForecastApp() {
         }
 
         /*
-         * EXPERIMENT: recover from a host that forwards the model-facing copy
-         * of the result (see docs/TROUBLESHOOTING.md).
+         * Recover from a host that forwards the model-facing copy of the
+         * result (see docs/TROUBLESHOOTING.md).
          *
-         * The pushed result lost its `structuredContent`, but `ontoolinput`
-         * gave us the arguments the tool was called with, so we can ask for the
-         * data again over the app->server channel. The open question this
-         * answers: does an *app-initiated* call keep `structuredContent` in a
-         * host where the *pushed* result does not?
+         * Claude Desktop hands the app the copy it built for the model --
+         * original text, plus a synthetic "the user can already see the widget"
+         * note -- and drops `structuredContent` along the way. But
+         * `ontoolinput` still delivers the arguments the tool was called with,
+         * and an *app-initiated* call keeps `structuredContent` intact, so we
+         * can simply ask for the data again.
          *
-         * If the chart renders, the answer is yes. If it does not, the error
-         * reports both shapes.
+         * Costs nothing on a host that pushes a complete result: this path only
+         * runs when the series is missing, so a correct host never reaches it.
+         * Delete it once the push path is fixed upstream.
          */
         const args = toolArgs.current;
         if (!args) {
