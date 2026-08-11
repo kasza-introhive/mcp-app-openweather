@@ -52,9 +52,25 @@ export function describeResultShape(result: unknown): string {
   const record = result as Record<string, unknown>;
   const keys = Object.keys(record);
   const parts = [`keys=[${keys.join(", ")}]`];
+  if (record.isError !== undefined) parts.push(`isError=${String(record.isError)}`);
 
   const content = record.content;
-  parts.push(`content=${Array.isArray(content) ? `${content.length} block(s)` : typeof content}`);
+  if (!Array.isArray(content)) {
+    parts.push(`content=${typeof content}`);
+  } else {
+    // Block types and a short preview of each. When a host substitutes the
+    // result -- e.g. swapping the payload for a pointer to a sandbox file --
+    // the substitution shows up here and nowhere else.
+    const blocks = content.map((block, i) => {
+      const b = block as { type?: string; text?: string };
+      const preview =
+        typeof b.text === "string"
+          ? `:"${b.text.slice(0, 120).replace(/\s+/g, " ")}${b.text.length > 120 ? "…" : ""}"`
+          : "";
+      return `#${i}=${b.type ?? "?"}${preview}`;
+    });
+    parts.push(`content=${content.length} block(s) [${blocks.join(" | ")}]`);
+  }
 
   const structured = record.structuredContent;
   if (structured === undefined) {

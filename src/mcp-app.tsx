@@ -96,11 +96,11 @@ function ForecastApp() {
       app.ontoolinput = (input) => {
         // Useful for streaming/preloading: arguments can arrive before the
         // result does.
-        console.info("tool input:", input);
+        debugLog("tool input:", input);
       };
 
       app.onteardown = async () => {
-        console.info("app teardown");
+        debugLog("app teardown");
         return {};
       };
 
