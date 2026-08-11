@@ -182,6 +182,41 @@ and is worth copying:
    `localStorage.mcpDebug = "1"`) enables `debugLog`. It stays in the codebase
    instead of being re-added by hand every time something breaks.
 
+## Worked example: the payload that vanished
+
+Running the ladder on the bug this guide was written for, against
+`ext-apps@1.7.5` / `sdk@1.30.0` in Claude Desktop (2026-08):
+
+**Rung 2** — a plain MCP client over stdio, no host:
+
+```
+outputSchema present: true
+_meta.ui: {"resourceUri":"ui://weather-forecast/mcp-app.html"}
+[get-forecast] returning content=1 block(s), structuredContent.points=40
+keys: [ 'content', 'structuredContent' ]   content blocks: 1 [ 'text' ]
+isError: undefined                          structuredContent: points=40
+```
+
+**Rung 3** — the same tool call, as the app received it in Claude Desktop:
+
+```
+Received: keys=[content, isError] content=2 block(s) structuredContent=absent
+```
+
+Different object. The host added `isError`, turned one content block into two,
+and dropped `structuredContent`. The model still answered correctly from the
+text, so nothing looked broken from the outside — only the chart failed.
+
+Conclusion: **the server was correct at every rung it owns**, and the payload
+died crossing the host→app bridge. Declaring `outputSchema` did not change this
+(it was added during the investigation and kept because it is right, not because
+it fixed anything). The call also went through Desktop's "Searched available
+tools" path, which proxies the call and is a plausible place for a result to be
+re-synthesized rather than passed through.
+
+The generalisable lesson: when rung 2 and rung 3 disagree, stop reading your own
+code. Diff the two shapes and take it upstream.
+
 ## Rung 4 — the app
 
 Test ids for locating state: `location`, `current-temp`, `error`, `waiting`,
