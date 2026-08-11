@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Fake MCP Host</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+      }
+      /*
+       * The app must get a real size or Recharts' ResponsiveContainer
+       * collapses to zero and nothing is drawable.
+       */
+      #app-frame {
+        display: block;
+        width: 100%;
+        height: 100vh;
+        border: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <!--
+      Minimal host page for the E2E specs.
+
+      The app MUST run inside an iframe: it posts to `window.parent`, so a
+      top-level page would receive its own messages. This page is that parent.
+
+      `src` is set by the spec (see openApp) rather than hard-coded, so the
+      bundle path stays owned by the test.
+    -->
+    <iframe id="app-frame" title="MCP App"></iframe>
+  </body>
+</html>
