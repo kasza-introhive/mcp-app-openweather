@@ -80,35 +80,49 @@ export type Location = z.infer<typeof GeocodeResultSchema>;
 
 // --- Public types ------------------------------------------------------------
 
-export interface ForecastPoint {
-  /** Unix seconds, UTC. */
-  dt: number;
-  /** Local-time label at the forecast location, e.g. "Mon 14:00". */
-  label: string;
-  /** ISO-ish local day key, e.g. "2026-08-11". */
-  day: string;
-  temp: number;
-  feelsLike: number;
-  humidity: number;
-  pressure: number;
-  windSpeed: number;
-  clouds: number;
-  /** Probability of precipitation as a percentage (0-100). */
-  pop: number;
-  /** Millimetres in the 3h window; 0 when absent. */
-  rain: number;
-  snow: number;
-  condition: string;
-  description: string;
-  icon: string;
-}
+// These are zod schemas rather than plain interfaces because the tool advertises
+// its result shape via `outputSchema` (see server.ts). Declaring the shape once
+// and inferring the types keeps the wire contract and the TypeScript types from
+// drifting apart. `.describe()` text surfaces to clients inspecting the tool.
 
-export interface ForecastSeries {
-  location: { name: string; country: string; lat: number; lon: number };
-  units: Units;
-  timezoneOffsetSeconds: number;
-  points: ForecastPoint[];
-}
+export const ForecastPointSchema = z.object({
+  dt: z.number().describe("Unix seconds, UTC"),
+  label: z.string().describe('Local-time label at the forecast location, e.g. "Mon 14:00"'),
+  day: z.string().describe('ISO-ish local day key, e.g. "2026-08-11"'),
+  temp: z.number(),
+  feelsLike: z.number(),
+  humidity: z.number(),
+  pressure: z.number(),
+  windSpeed: z.number(),
+  clouds: z.number(),
+  pop: z.number().describe("Probability of precipitation as a percentage (0-100)"),
+  rain: z.number().describe("Millimetres in the 3h window; 0 when absent"),
+  snow: z.number().describe("Millimetres in the 3h window; 0 when absent"),
+  condition: z.string(),
+  description: z.string(),
+  icon: z.string(),
+});
+
+/**
+ * The raw shape, not the object schema: `registerAppTool` takes a
+ * `ZodRawShapeCompat` for `outputSchema`, mirroring how `inputSchema` is passed.
+ */
+export const forecastSeriesShape = {
+  location: z.object({
+    name: z.string(),
+    country: z.string(),
+    lat: z.number(),
+    lon: z.number(),
+  }),
+  units: z.enum(UNITS),
+  timezoneOffsetSeconds: z.number().describe("Shift from UTC in seconds at the forecast location"),
+  points: z.array(ForecastPointSchema),
+};
+
+export const ForecastSeriesSchema = z.object(forecastSeriesShape);
+
+export type ForecastPoint = z.infer<typeof ForecastPointSchema>;
+export type ForecastSeries = z.infer<typeof ForecastSeriesSchema>;
 
 // --- Errors ------------------------------------------------------------------
 

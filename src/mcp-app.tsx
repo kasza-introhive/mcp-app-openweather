@@ -12,10 +12,11 @@
 import type { App, McpUiHostContext } from "@modelcontextprotocol/ext-apps";
 import { useApp } from "@modelcontextprotocol/ext-apps/react";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
-import { StrictMode, useCallback, useEffect, useMemo, useState } from "react";
+import { StrictMode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { ForecastChart, type Metric } from "./components/ForecastChart.tsx";
 import { Controls } from "./components/Controls.tsx";
+import { debugLog, describeResultShape } from "./debug.ts";
 import {
   ICON_BASE_URL,
   unitSymbols,
@@ -40,11 +41,25 @@ function extractSeries(result: CallToolResult): ForecastSeries | null {
     candidate &&
     typeof candidate === "object" &&
     Array.isArray((candidate as ForecastSeries).points) &&
+    // An empty series would render an axis with nothing on it, which reads as a
+    // broken chart rather than an error. Treat it as missing data.
+    (candidate as ForecastSeries).points.length > 0 &&
     (candidate as ForecastSeries).location != null
   ) {
     return candidate as ForecastSeries;
   }
   return null;
+}
+
+/**
+ * The message shown when a result arrives without a usable series.
+ *
+ * It embeds the actual shape received because this app may be running in a host
+ * with no reachable console -- the screen is the only diagnostic channel. See
+ * docs/TROUBLESHOOTING.md.
+ */
+function missingDataError(result: CallToolResult): string {
+  return `The tool result did not contain forecast data. Received: ${describeResultShape(result)}`;
 }
 
 function errorTextOf(result: CallToolResult): string {
@@ -57,6 +72,10 @@ function ForecastApp() {
   const [error, setError] = useState<string | null>(null);
   const [hostContext, setHostContext] = useState<McpUiHostContext | undefined>();
 
+  // The arguments the tool was called with, captured from `ontoolinput`. Used
+  // only by the recovery probe below.
+  const toolArgs = useRef<Record<string, unknown> | null>(null);
+
   const { app, error: connectionError } = useApp({
     appInfo: { name: "OpenWeather Forecast App", version: "1.0.0" },
     capabilities: {},
@@ -64,6 +83,7 @@ function ForecastApp() {
       // Fires when the host pushes the result of the tool call that opened
       // this app, and again for any result the host chooses to forward.
       app.ontoolresult = (result) => {
+        debugLog("ontoolresult:", describeResultShape(result));
         if (result.isError) {
           setError(errorTextOf(result));
           return;
@@ -72,19 +92,59 @@ function ForecastApp() {
         if (next) {
           setSeries(next);
           setError(null);
-        } else {
-          setError("The tool result did not contain forecast data.");
+          return;
         }
+
+        /*
+         * Recover from a host that forwards the model-facing copy of the
+         * result (see docs/TROUBLESHOOTING.md).
+         *
+         * Claude Desktop hands the app the copy it built for the model --
+         * original text, plus a synthetic "the user can already see the widget"
+         * note -- and drops `structuredContent` along the way. But
+         * `ontoolinput` still delivers the arguments the tool was called with,
+         * and an *app-initiated* call keeps `structuredContent` intact, so we
+         * can simply ask for the data again.
+         *
+         * Costs nothing on a host that pushes a complete result: this path only
+         * runs when the series is missing, so a correct host never reaches it.
+         * Delete it once the push path is fixed upstream.
+         */
+        const args = toolArgs.current;
+        if (!args) {
+          setError(missingDataError(result));
+          return;
+        }
+
+        void (async () => {
+          try {
+            const retry = await app.callServerTool({ name: TOOL_NAME, arguments: args });
+            debugLog("recovery re-fetch:", describeResultShape(retry));
+            const recovered = extractSeries(retry);
+            if (recovered) {
+              setSeries(recovered);
+              setError(null);
+            } else {
+              setError(`${missingDataError(result)} — re-fetch also: ${describeResultShape(retry)}`);
+            }
+          } catch (e) {
+            setError(
+              `${missingDataError(result)} — re-fetch failed: ${e instanceof Error ? e.message : String(e)}`,
+            );
+          }
+        })();
       };
 
       app.ontoolinput = (input) => {
         // Useful for streaming/preloading: arguments can arrive before the
-        // result does.
-        console.info("tool input:", input);
+        // result does. Also the only surviving copy of the call's arguments
+        // when a host mangles the result -- see the recovery probe above.
+        toolArgs.current = (input.arguments ?? null) as Record<string, unknown> | null;
+        debugLog("tool input:", input);
       };
 
       app.onteardown = async () => {
-        console.info("app teardown");
+        debugLog("app teardown");
         return {};
       };
 
@@ -177,6 +237,7 @@ function ForecastAppInner({
           },
         });
 
+        debugLog("callServerTool result:", describeResultShape(result));
         if (result.isError) {
           setError(errorTextOf(result));
           return;
@@ -186,7 +247,7 @@ function ForecastAppInner({
           setSeries(parsed);
           setError(null);
         } else {
-          setError("The tool result did not contain forecast data.");
+          setError(missingDataError(result));
         }
       } catch (e) {
         setError(e instanceof Error ? e.message : String(e));

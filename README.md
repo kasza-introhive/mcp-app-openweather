@@ -221,6 +221,12 @@ type "%APPDATA%\Claude\logs\mcp-server-openweather-forecast.log"
 | Unparseable-message errors | Launched via `npm` instead of `node` (see step 5) |
 | Tool errors mentioning `OPENWEATHER_API_KEY` | `.env` missing, key not pasted, or key not yet activated |
 | Chart never renders but text works | `npm run build` wasn't run, so `dist/mcp-app.html` is absent |
+| Chart renders but shows an error | Read the shape in the message, then see [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) |
+
+For anything subtler than the table above — especially a chart that loads but
+shows an error — [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) walks the
+payload's five rungs (data source → tool handler → wire → host bridge → render)
+and shows how to observe each one in isolation.
 
 To confirm the server itself is healthy, independent of Claude, run it by hand
 from the project directory — it should print one line of JSON:
@@ -297,12 +303,20 @@ enforce the iframe sandbox or CSP. For that:
 
 ```bash
 git clone https://github.com/modelcontextprotocol/ext-apps
-cd ext-apps/examples/basic-host && npm install
-SERVERS='["http://localhost:3001/mcp"]' npm start   # then open localhost:8080
+cd ext-apps && npm install && npm run build   # a workspace: install at the ROOT
+cd examples/basic-host && npm run build
+SERVERS='["http://localhost:3001/mcp"]' node --import tsx serve.ts   # open localhost:8080
 ```
+
+Installing inside `examples/basic-host` triggers the workspace root's `prepare`
+script and fails. `npm run serve` there wants `bun`; `serve.ts` is plain express,
+so `node --import tsx` works if you don't have it.
 
 Confirm the chart draws, the icons load (that's the CSP allowance working), and a
 control change shows a new `tools/call` in the server log.
+
+For anything that survives this, see
+[docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md).
 
 ## Why forecast and not history
 
