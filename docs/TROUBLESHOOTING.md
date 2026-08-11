@@ -233,6 +233,24 @@ Different object. The host added `isError`, turned one content block into two,
 and dropped `structuredContent`. The model still answered correctly from the
 text, so nothing looked broken from the outside — only the chart failed.
 
+**The mechanism.** Printing the content blocks named it:
+
+```
+#0=text:"40-point forecast for Downtown Toronto, CA: 2026-08-11: 22.0-26.8°C, clouds…"
+#1=text:"[This tool call rendered an interactive widget in the chat. The user can
+         already see the result — do not repeat it in te…"
+```
+
+Block #1 is not ours. It is Claude Desktop's own instruction *to the model*
+("the user can already see the widget, don't repeat it"). The host builds a
+model-facing copy of the tool result — original text, plus that note, plus
+`isError: false` — and forwards **that copy** to the app instead of the original.
+`structuredContent` is dropped along the way, because the model never needed it.
+
+So the app is handed the model's version of the result. Everything else follows:
+two blocks, an `isError` the server never set, no `structuredContent`, a model
+that answers correctly, and a chart that cannot draw.
+
 Conclusion: **the server was correct at every rung it owns**, and the payload
 died crossing the host→app bridge. Declaring `outputSchema` did not change this
 (it was added during the investigation and kept because it is right, not because
