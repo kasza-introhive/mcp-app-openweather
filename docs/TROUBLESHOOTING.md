@@ -171,6 +171,16 @@ They exist, and they are not obvious:
 **Developer → Reload MCP Configuration** applies `claude_desktop_config.json`
 edits without a restart.
 
+> **The host caches the `ui://` resource.** Reloading the MCP configuration
+> restarts the *server* but can leave the app iframe running a previously
+> fetched bundle, so `npm run build` appears to do nothing. Fully quit the host
+> (Cmd+Q) and start a **new conversation** to force a re-fetch.
+>
+> Always leave yourself a way to tell which build you are looking at — a version
+> string, or a diagnostic whose *format* changed. Confirm the bundle on disk
+> first (`grep` for a string only the new build contains); if the file is right
+> and the screen is wrong, you are looking at a cache, not a bug.
+
 On iOS the app runs in a `WKWebView`, inspectable from a connected Mac via
 Safari's Web Inspector.
 
