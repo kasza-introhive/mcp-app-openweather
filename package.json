@@ -1,0 +1,51 @@
+{
+  "name": "mcp-app-openweather",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "POC MCP App that visualizes OpenWeather 5-day/3-hour forecast data as an interactive chart in the chat.",
+  "license": "MIT",
+  "scripts": {
+    "build": "tsc --noEmit && cross-env INPUT=mcp-app.html vite build",
+    "watch": "cross-env INPUT=mcp-app.html vite build --watch",
+    "serve": "node --env-file-if-exists=.env --import tsx main.ts",
+    "serve:stdio": "node --env-file-if-exists=.env --import tsx main.ts --stdio",
+    "dev": "cross-env NODE_ENV=development concurrently \"npm run watch\" \"npm run serve\"",
+    "start": "npm run build && npm run serve",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:live": "cross-env RUN_LIVE=1 node --env-file-if-exists=.env node_modules/vitest/vitest.mjs run",
+    "test:e2e": "playwright test",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/ext-apps": "^1.7.5",
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "cors": "^2.8.6",
+    "express": "^5.2.1",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "recharts": "^3.10.1",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.62.1",
+    "@testing-library/react": "^16.3.2",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.0",
+    "@types/node": "^22.10.0",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.4",
+    "@vitejs/plugin-react": "^5.2.0",
+    "@vitest/coverage-v8": "^4.1.10",
+    "concurrently": "^9.2.1",
+    "cross-env": "^10.1.0",
+    "jsdom": "^30.0.1",
+    "msw": "^2.15.0",
+    "tsx": "^4.23.12",
+    "typescript": "~5.9.3",
+    "vite": "^7.1.0",
+    "vite-plugin-singlefile": "^2.3.3",
+    "vitest": "^4.1.10"
+  }
+}

@@ -1,1 +1,25 @@
+# Secrets. `.env.example` is the tracked template.
 .env
+
+# Dependencies
+/node_modules
+
+# Build output. `npm run build` regenerates dist/mcp-app.html, a ~900K
+# single-file bundle -- committing it would bury every UI change in noise.
+/dist
+
+# Test artifacts
+# test-results/ = Playwright failure screenshots + traces
+# playwright-report/ = Playwright HTML reporter output
+# coverage/ = @vitest/coverage-v8
+/test-results
+/playwright-report
+/coverage
+
+# Logs
+*.log
+npm-debug.log*
+
+# Editor / OS
+.DS_Store
+/.claude/settings.local.json
