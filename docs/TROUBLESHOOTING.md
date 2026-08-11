@@ -158,6 +158,22 @@ Runs in a normal browser tab, so **you get DevTools** — the console, the netwo
 tab, and CSP violation reports that no other rung can show you. If the chart
 works here but not in Claude Desktop, the bug is Desktop-specific.
 
+### Claude Desktop DevTools
+
+They exist, and they are not obvious:
+
+1. **Help → Troubleshooting → Enable Developer Mode**. A **Developer** menu appears.
+2. `Cmd+Option+I` (macOS) / `Ctrl+Shift+I` (Windows).
+3. Your app is the **inner** iframe of a nested pair — inspect the tool call
+   element to find it. Run `localStorage.mcpDebug = "1"` in that frame to turn
+   on `debugLog`.
+
+**Developer → Reload MCP Configuration** applies `claude_desktop_config.json`
+edits without a restart.
+
+On iOS the app runs in a `WKWebView`, inspectable from a connected Mac via
+Safari's Web Inspector.
+
 ### When you have no console at all
 
 Claude Desktop renders the app in a webview with no reachable DevTools. A
@@ -214,8 +230,46 @@ it fixed anything). The call also went through Desktop's "Searched available
 tools" path, which proxies the call and is a plausible place for a result to be
 re-synthesized rather than passed through.
 
+**Rung 3, second host** — `basic-host` 1.7.5, same server, same bundle: the
+chart renders, icons load, and the in-app °F control round-trips a real
+`tools/call` whose `structuredContent` arrives intact. It enforces the real
+iframe sandbox and cross-origin CSP, so this is not a lenient-harness pass.
+
+| Host | Result reaching the app | Chart |
+|---|---|---|
+| `basic-host` 1.7.5 | `content` (1 block) + `structuredContent` 40 pts | renders |
+| Claude Desktop | `content` (2 blocks) + `isError`, no `structuredContent` | error |
+
 The generalisable lesson: when rung 2 and rung 3 disagree, stop reading your own
 code. Diff the two shapes and take it upstream.
+
+### Hypotheses this killed
+
+Worth recording, because each looked obvious and cost time:
+
+- **Missing `outputSchema`.** Plausible — the app depends entirely on
+  `structuredContent`. But the SDK does not strip the field without one
+  (`validateToolOutput` returns early), and adding it changed nothing.
+- **The documented large-payload path.** Claude's docs describe results over
+  ~150,000 characters being written to the code-execution sandbox filesystem,
+  with the app receiving *a pointer to the file rather than the structured
+  content* — which predicts this symptom exactly. Measured: the full result is
+  **10,054 characters**, 7% of the threshold. Ruled out.
+- **A missing Claude-specific requirement.** Checked against the published docs:
+  `_meta.ui.resourceUri`, the `ui://[app]/[file].html` pattern, matching
+  resource URI, `RESOURCE_MIME_TYPE`, `useApp()`/`connect()`, non-zero iframe
+  height. All satisfied. `_meta.ui.domain` is correctly absent — it is for
+  remote connectors running their own OAuth and is unavailable over stdio.
+
+What remains: the failing call went through Claude Desktop's "Searched available
+tools" path, i.e. **the code-execution sandbox was active**. The size threshold
+governs the file-write, but a call proxied through that sandbox plausibly loses
+`structuredContent` regardless of size — the result returns as text, which is
+what the 2-blocks-plus-`isError` shape looks like. Testable by disabling tool
+search and re-running: one variable, and a clean repro if it renders.
+
+**Measure before believing a documented limit applies to you.** Two of the three
+hypotheses above were killed by a single number.
 
 ## Rung 4 — the app
 
@@ -230,6 +284,11 @@ treated as missing data rather than drawing an axis with nothing on it.
 
 Read the generated schema rather than guessing:
 `node_modules/@modelcontextprotocol/ext-apps/dist/src/generated/schema.json`.
+
+Claude's own docs are the other half — in particular
+[Troubleshooting MCP Apps](https://claude.com/docs/connectors/building/mcp-apps/troubleshooting),
+which documents the DevTools route, the ~150,000-character sandbox threshold,
+and `ui.domain` validation. The full index is at `https://claude.com/docs/llms.txt`.
 
 - **`structuredContent` is optional** in `McpUiToolResultNotification`. Nothing
   in the protocol obliges a host to forward it. An app that depends on it should
