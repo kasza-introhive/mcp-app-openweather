@@ -154,6 +154,25 @@ test.describe("initial render", () => {
     await expect(app.getByTestId("forecast-chart")).toHaveCount(0);
   });
 
+  /*
+   * The recovery probe: when the pushed result has no usable series but the
+   * tool arguments arrived via `ontoolinput`, the app re-fetches over the
+   * app->server channel and renders that instead.
+   *
+   * The fake host does not send `ui/notifications/tool-input`, so this drives
+   * the path the probe takes when it has nothing to re-fetch with: report,
+   * don't retry.
+   */
+  test("does not re-fetch when no tool input arrived", async ({ page }) => {
+    const app = await openApp(page, {
+      initialResult: { content: [{ type: "text", text: "Forecast for Halifax" }] },
+      queuedResults: [toolResult()],
+    });
+
+    await expect(app.getByTestId("error")).toContainText("structuredContent=absent");
+    expect(await recordedCalls(page)).toHaveLength(0);
+  });
+
   test("reports the received shape when the series has no points", async ({ page }) => {
     const result = toolResult();
     const app = await openApp(page, {

@@ -12,7 +12,7 @@
 import type { App, McpUiHostContext } from "@modelcontextprotocol/ext-apps";
 import { useApp } from "@modelcontextprotocol/ext-apps/react";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
-import { StrictMode, useCallback, useEffect, useMemo, useState } from "react";
+import { StrictMode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { ForecastChart, type Metric } from "./components/ForecastChart.tsx";
 import { Controls } from "./components/Controls.tsx";
@@ -72,6 +72,10 @@ function ForecastApp() {
   const [error, setError] = useState<string | null>(null);
   const [hostContext, setHostContext] = useState<McpUiHostContext | undefined>();
 
+  // The arguments the tool was called with, captured from `ontoolinput`. Used
+  // only by the recovery probe below.
+  const toolArgs = useRef<Record<string, unknown> | null>(null);
+
   const { app, error: connectionError } = useApp({
     appInfo: { name: "OpenWeather Forecast App", version: "1.0.0" },
     capabilities: {},
@@ -88,14 +92,52 @@ function ForecastApp() {
         if (next) {
           setSeries(next);
           setError(null);
-        } else {
-          setError(missingDataError(result));
+          return;
         }
+
+        /*
+         * EXPERIMENT: recover from a host that forwards the model-facing copy
+         * of the result (see docs/TROUBLESHOOTING.md).
+         *
+         * The pushed result lost its `structuredContent`, but `ontoolinput`
+         * gave us the arguments the tool was called with, so we can ask for the
+         * data again over the app->server channel. The open question this
+         * answers: does an *app-initiated* call keep `structuredContent` in a
+         * host where the *pushed* result does not?
+         *
+         * If the chart renders, the answer is yes. If it does not, the error
+         * reports both shapes.
+         */
+        const args = toolArgs.current;
+        if (!args) {
+          setError(missingDataError(result));
+          return;
+        }
+
+        void (async () => {
+          try {
+            const retry = await app.callServerTool({ name: TOOL_NAME, arguments: args });
+            debugLog("recovery re-fetch:", describeResultShape(retry));
+            const recovered = extractSeries(retry);
+            if (recovered) {
+              setSeries(recovered);
+              setError(null);
+            } else {
+              setError(`${missingDataError(result)} — re-fetch also: ${describeResultShape(retry)}`);
+            }
+          } catch (e) {
+            setError(
+              `${missingDataError(result)} — re-fetch failed: ${e instanceof Error ? e.message : String(e)}`,
+            );
+          }
+        })();
       };
 
       app.ontoolinput = (input) => {
         // Useful for streaming/preloading: arguments can arrive before the
-        // result does.
+        // result does. Also the only surviving copy of the call's arguments
+        // when a host mangles the result -- see the recovery probe above.
+        toolArgs.current = (input.arguments ?? null) as Record<string, unknown> | null;
         debugLog("tool input:", input);
       };
 
